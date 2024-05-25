@@ -85,8 +85,8 @@ body {
   white-space: nowrap;
 }
 
-.title-time-ago {
-  width: 80px;
+.title-transaction-block-number {
+  width: 60px;
 }
 
 .wrapper-address-title {

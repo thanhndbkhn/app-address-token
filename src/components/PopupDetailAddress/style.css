@@ -1,0 +1,55 @@
+.wrapper-popup-detail-address {
+  width: 100%;
+}
+
+.wrapper-popup-detail-address h4 {
+  margin-bottom: 12px;
+}
+
+.wrapper-popup-detail-item {
+  margin-bottom: 12px;
+}
+
+.popup-detail-label {
+  font-weight: 600;
+  font-size: 1.2rem;
+  margin-bottom: 4px;
+}
+
+.popup-detail-content {
+  font-size: 1.1rem;
+}
+
+.text-success {
+  color: rgba(0, 161, 134);
+}
+
+.text-primary {
+  color: rgb(7, 132, 195);
+  text-decoration: none;
+}
+
+.text-secondary {
+  color: #6c757d;
+}
+
+.popup-detail-send {
+  display: flex;
+  align-items: center;
+}
+
+.popup-detail-send-content {
+  display: -webkit-box;
+  max-width: 100%;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: normal;
+}
+
+.wrapper-popup-detail-address svg {
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}

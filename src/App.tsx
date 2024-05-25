@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import "./App.css";
 import {
+  Box,
   Button,
   Chip,
+  ClickAwayListener,
   Container,
   IconButton,
   styled,
@@ -12,6 +14,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   Tooltip,
   tooltipClasses,
@@ -26,6 +29,8 @@ import RemoveRedEyeOutlinedIcon from "@mui/icons-material/RemoveRedEyeOutlined";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import { instanceAxios } from "./config/axios";
 import { Link } from "react-router-dom";
+import PopupDetailAddress from "./components/PopupDetailAddress/PopupDetailAddress";
+import { useDownloadExcel } from "react-export-table-to-excel";
 
 interface Data {
   helper: React.ReactNode;
@@ -78,11 +83,20 @@ interface IResponseDataTokenTransfer {
   result: IDataTokenTransfer[];
 }
 
+interface IParameters {
+  page: number;
+  take: number;
+}
+
 const LightTooltip = styled(({ className, ...props }: TooltipProps) => (
   <Tooltip {...props} classes={{ popper: className }} />
 ))(({ theme }) => ({
   [`& .${tooltipClasses.arrow}`]: {
     color: theme.palette.common.white,
+    "&::before": {
+      backgroundColor: theme.palette.common.white,
+      border: "1px solid #dee2e6",
+    },
   },
   [`& .${tooltipClasses.tooltip}`]: {
     backgroundColor: theme.palette.common.white,
@@ -90,6 +104,7 @@ const LightTooltip = styled(({ className, ...props }: TooltipProps) => (
     fontSize: "1.3rem",
     border: "1px solid #dee2e6",
     padding: "16px",
+    textAlign: "left",
   },
 }));
 
@@ -105,89 +120,6 @@ const BootstrapTooltip = styled(({ className, ...props }: TooltipProps) => (
   },
 }));
 
-const headCells: readonly HeadCell[] = [
-  {
-    id: "helper",
-    numeric: false,
-    disablePadding: true,
-    label: (
-      <LightTooltip
-        title="See preview of the Transaction details"
-        arrow
-        placement="right-start"
-      >
-        <HelpOutlineOutlinedIcon />
-      </LightTooltip>
-    ),
-    width: 52,
-    className: "table-head-see",
-    align: "center",
-  },
-  {
-    id: "transactionHash",
-    numeric: false,
-    disablePadding: false,
-    label: "Transaction Hash",
-    align: "left",
-  },
-  {
-    id: "method",
-    numeric: false,
-    disablePadding: false,
-    label: "Method",
-    align: "left",
-  },
-  {
-    id: "block",
-    numeric: true,
-    disablePadding: false,
-    label: "Block",
-    align: "left",
-  },
-  {
-    id: "age",
-    numeric: true,
-    disablePadding: false,
-    label: "Age",
-    align: "left",
-  },
-  {
-    id: "from",
-    numeric: true,
-    disablePadding: false,
-    label: "From",
-    align: "left",
-  },
-  {
-    id: "inOut",
-    numeric: true,
-    disablePadding: false,
-    label: "",
-    align: "left",
-  },
-  {
-    id: "to",
-    numeric: true,
-    disablePadding: false,
-    label: "To",
-    align: "left",
-  },
-  {
-    id: "value",
-    numeric: true,
-    disablePadding: false,
-    label: "Value",
-    align: "left",
-  },
-  {
-    id: "token",
-    numeric: true,
-    disablePadding: false,
-    label: "Token",
-    align: "left",
-  },
-];
-
 const timeAgo = (timestamp: string) => {
   const date = new Date(Number(timestamp) * 1000);
   const hour = date.getHours();
@@ -197,60 +129,242 @@ const timeAgo = (timestamp: string) => {
   return `Just now`;
 };
 
-const shortenAddress = (address: string) => {
+const convertTimestamp = (timestamp: string) => {
+  const date = new Date(Number(timestamp) * 1000);
+
+  const formattedTime =
+    date.getFullYear() +
+    "-" +
+    ("0" + (date.getMonth() + 1)).slice(-2) +
+    "-" +
+    ("0" + date.getDate()).slice(-2) +
+    " " +
+    ("0" + date.getHours()).slice(-2) +
+    ":" +
+    ("0" + date.getMinutes()).slice(-2) +
+    ":" +
+    ("0" + date.getSeconds()).slice(-2);
+
+  return formattedTime;
+};
+
+export const shortenAddress = (address: string) => {
   const start = address.slice(0, 10);
   const end = address.slice(-8);
   return `${start}....${end}`;
 };
 
 function App() {
+  const tableRef = useRef<any>(null);
   const [dataTokenTransfer, setDataTokenTransfer] = useState<
     IDataTokenTransfer[]
   >([]);
-
+  const [openDetail, setOpenDetail] = useState<string>("");
   const [copied, setCopied] = useState<string>("");
+  const [parameters, setParameters] = useState<IParameters>({
+    page: 1,
+    take: 25,
+  });
+  const [isColumnDatetimeFormat, setIsColumnDatetimeFormat] =
+    useState<boolean>(false);
+  const [isShowInfoNote, setIsShowInfoNote] = useState<boolean>(true);
+
+  const headCells: readonly HeadCell[] = [
+    {
+      id: "helper",
+      numeric: false,
+      disablePadding: true,
+      label: (
+        <LightTooltip
+          title="See preview of the Transaction details"
+          arrow
+          placement="right-start"
+        >
+          <HelpOutlineOutlinedIcon />
+        </LightTooltip>
+      ),
+      width: 52,
+      className: "table-head-see",
+      align: "center",
+    },
+    {
+      id: "transactionHash",
+      numeric: false,
+      disablePadding: false,
+      label: "Transaction Hash",
+      align: "left",
+    },
+    {
+      id: "method",
+      numeric: false,
+      disablePadding: false,
+      label: (
+        <Box sx={{ display: "flex", gap: "8px" }}>
+          <span>Method</span>
+          <LightTooltip
+            title="Function executed based on decoded input data. For unidentified functional, method ID is displayed instead"
+            arrow
+            placement="right-start"
+          >
+            <HelpOutlineOutlinedIcon />
+          </LightTooltip>
+        </Box>
+      ),
+      align: "left",
+    },
+    {
+      id: "block",
+      numeric: true,
+      disablePadding: false,
+      label: "Block",
+      align: "left",
+    },
+    {
+      id: "age",
+      numeric: true,
+      disablePadding: false,
+      label: (
+        <BootstrapTooltip
+          title={
+            !isColumnDatetimeFormat
+              ? "Click to show Datetime Format"
+              : "Click to show Age"
+          }
+          placement="top"
+        >
+          <div>
+            {isColumnDatetimeFormat && (
+              <p
+                style={{ color: "#0784c3", cursor: "pointer", width: "120px" }}
+                aria-hidden
+                onClick={() => {
+                  setIsColumnDatetimeFormat(!isColumnDatetimeFormat);
+                }}
+              >
+                Date Time (UTC)
+              </p>
+            )}
+            {!isColumnDatetimeFormat && (
+              <p
+                style={{ color: "#0784c3", cursor: "pointer", width: "0px" }}
+                aria-hidden
+                onClick={() => {
+                  setIsColumnDatetimeFormat(!isColumnDatetimeFormat);
+                }}
+              >
+                Age
+              </p>
+            )}
+          </div>
+        </BootstrapTooltip>
+      ),
+      align: "left",
+    },
+    {
+      id: "from",
+      numeric: true,
+      disablePadding: false,
+      label: "From",
+      align: "left",
+    },
+    {
+      id: "inOut",
+      numeric: true,
+      disablePadding: false,
+      label: "",
+      align: "left",
+    },
+    {
+      id: "to",
+      numeric: true,
+      disablePadding: false,
+      label: "To",
+      align: "left",
+    },
+    {
+      id: "value",
+      numeric: true,
+      disablePadding: false,
+      label: "Value",
+      align: "left",
+    },
+    {
+      id: "token",
+      numeric: true,
+      disablePadding: false,
+      label: "Token",
+      align: "left",
+    },
+  ];
 
   useEffect(() => {
     instanceAxios
       .get<IResponseDataTokenTransfer>(
-        "?module=account&action=tokentx&contractaddress=0xe02df9e3e622debdd69fb838bb799e3f168902c5&address=0x0c82922944350ffe0ec8ad1f08995ae0eed10e75&page=1&offset=5&sort=asc&apikey=YourApiKeyToken"
+        `?module=account&action=tokentx&contractaddress=0xe02df9e3e622debdd69fb838bb799e3f168902c5&address=0x0c82922944350ffe0ec8ad1f08995ae0eed10e75&page=${parameters.page}&offset=${parameters.take}&sort=asc&apikey=YourApiKeyToken`
       )
       .then((response: any) => {
         setDataTokenTransfer(response.result);
-        // setLoading(false);
       })
-      .catch((error) => {
-        // setError(error);
-        // setLoading(false);
-      });
-  }, []);
+      .catch((error) => {});
+  }, [parameters]);
+
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setParameters({
+      ...parameters,
+      page: newPage,
+    });
+  };
+
+  const handleChangeRowsPerPage = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setParameters({
+      ...parameters,
+      take: parseInt(event.target.value, 10),
+      page: 1,
+    });
+  };
+
+  const { onDownload: onDownloadFileExcel } = useDownloadExcel({
+    currentTableRef: tableRef.current,
+    filename: "export-token-transfer",
+    sheet: "export-token-transfer",
+  });
 
   return (
     <div className="App">
       <Container maxWidth="lg">
         <div className="wrapper-table">
           <div className="wrapper-table-head">
-            <div className="wrapper-table-head-info">
-              <div className="wrapper-table-head-info-text">
-                <span>
-                  <InfoOutlinedIcon />
-                  Transactions involving tokens marked as suspicious, unsafe,
-                  spam or brand infringement are currently hidden. To show them,
-                  go to Site Settings.
-                </span>
+            {isShowInfoNote && (
+              <div className="wrapper-table-head-info">
+                <div className="wrapper-table-head-info-text">
+                  <span>
+                    <InfoOutlinedIcon />
+                    Transactions involving tokens marked as suspicious, unsafe,
+                    spam or brand infringement are currently hidden. To show
+                    them, go to Site Settings.
+                  </span>
+                </div>
+                <IconButton
+                  className="btn-close-info"
+                  aria-label="close"
+                  onClick={() => setIsShowInfoNote(false)}
+                >
+                  <CloseOutlinedIcon sx={{ fontSize: 24 }} />
+                </IconButton>
               </div>
-              <IconButton className="btn-close-info" aria-label="close">
-                <CloseOutlinedIcon sx={{ fontSize: 24 }} />
-              </IconButton>
-            </div>
+            )}
             <div className="wrapper-table-head-table-info">
               <p>
                 <BootstrapTooltip title="Oldest First" placement="right">
                   <FilterAltRoundedIcon />
                 </BootstrapTooltip>
-                Latest 25 BEP-20 Token Transfer Events (View All)
+                Latest {parameters.take} BEP-20 Token Transfer Events (View All)
               </p>
+
               <Button
+                onClick={onDownloadFileExcel}
                 startIcon={<FileDownloadRoundedIcon />}
                 variant="outlined"
                 size="medium"
@@ -273,6 +387,7 @@ function App() {
           </div>
           <TableContainer>
             <Table
+              ref={tableRef}
               aria-labelledby="tableTitle"
               size={"medium"}
               sx={{
@@ -313,50 +428,75 @@ function App() {
                   return (
                     <TableRow
                       hover
-                      // onClick={(event) => handleClick(event, row.id)}
                       role="checkbox"
-                      // aria-checked={isItemSelected}
                       tabIndex={-1}
                       key={item.blockNumber}
-                      // selected={isItemSelected}
                       sx={{ cursor: "pointer" }}
                     >
-                      <TableCell
-                        // component="th"
-                        // id={labelId}
-                        scope="row"
-                        padding="none"
-                        align="center"
-                      >
-                        <Button
-                          startIcon={<RemoveRedEyeOutlinedIcon />}
-                          variant="outlined"
-                          size="small"
-                          sx={{
-                            display: "flex",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            color: "#212529",
-                            borderColor: "#e9ecef",
-                            padding: "8px",
+                      <TableCell scope="row" padding="none" align="center">
+                        <ClickAwayListener
+                          onClickAway={() => setOpenDetail("")}
+                        >
+                          <div>
+                            <LightTooltip
+                              PopperProps={{
+                                disablePortal: true,
+                              }}
+                              onClose={() => setOpenDetail("")}
+                              open={openDetail === item.hash}
+                              disableFocusListener
+                              disableHoverListener
+                              disableTouchListener
+                              title={
+                                <PopupDetailAddress
+                                  from={item.from}
+                                  to={item.to}
+                                  transactionFee={0.03}
+                                  nonce={item.nonce}
+                                />
+                              }
+                              arrow
+                              placement="right"
+                              sx={{
+                                maxWidth: "400px",
 
-                            ".MuiButton-icon": {
-                              width: "14px",
-                              height: "14px",
-                              display: "flex",
-                              justifyContent: "center",
-                              alignItems: "center",
-                              marginRight: "0px",
-                            },
-                          }}
-                        />
+                                ".MuiTooltip-tooltip": {
+                                  maxWidth: "400px",
+                                },
+                              }}
+                            >
+                              <Button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setOpenDetail(item.hash);
+                                }}
+                                startIcon={<RemoveRedEyeOutlinedIcon />}
+                                variant="outlined"
+                                size="small"
+                                sx={{
+                                  display: "flex",
+                                  justifyContent: "center",
+                                  alignItems: "center",
+                                  color: "#212529",
+                                  borderColor: "#e9ecef",
+                                  padding: "8px",
+
+                                  ".MuiButton-icon": {
+                                    width: "14px",
+                                    height: "14px",
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    marginRight: "0px",
+                                  },
+                                }}
+                              />
+                            </LightTooltip>
+                          </div>
+                        </ClickAwayListener>
                       </TableCell>
-                      <TableCell
-                        // component="th"
-                        // id={labelId}
-                        scope="row"
-                        padding="none"
-                      >
+                      <TableCell scope="row" padding="none">
                         <Link to="/" className="title-transaction-hash">
                           {item.hash}
                         </Link>
@@ -366,10 +506,9 @@ function App() {
                           <Chip
                             label="Transfer"
                             sx={{
-                              border: "1px solid #919191",
+                              border: "1px solid #dfe0e1",
                               borderRadius: "6px",
-                              padding: "2px 0",
-                              height: "20px",
+                              height: "24px",
                               fontSize: "1.1rem",
                               backgroundColor: "#f8f9fa",
                             }}
@@ -379,27 +518,37 @@ function App() {
                       <TableCell scope="row" padding="none">
                         <Link
                           to={`/block/${item.blockNumber}`}
-                          className="title-transaction-hash"
+                          className="title-transaction-hash title-transaction-block-number"
                         >
                           {item.blockNumber}
                         </Link>
                       </TableCell>
-                      <TableCell
-                        // component="th"
-                        // id={labelId}
-                        scope="row"
-                        padding="none"
-                      >
-                        <p className="title-time-ago">
-                          {timeAgo(item.timeStamp)}
-                        </p>
+                      <TableCell scope="row" padding="none">
+                        <BootstrapTooltip
+                          title={
+                            !isColumnDatetimeFormat
+                              ? convertTimestamp(item.timeStamp)
+                              : timeAgo(item.timeStamp)
+                          }
+                          placement="top"
+                        >
+                          <p
+                            className="title-time-ago"
+                            style={{
+                              width: isColumnDatetimeFormat ? "140px" : "70px",
+                            }}
+                          >
+                            {isColumnDatetimeFormat
+                              ? convertTimestamp(item.timeStamp)
+                              : timeAgo(item.timeStamp)}
+                          </p>
+                        </BootstrapTooltip>
                       </TableCell>
                       <TableCell scope="row" padding="none">
                         <div className="wrapper-address-title">
                           <BootstrapTooltip title={item.from} placement="top">
                             <p>{shortenAddress(item.from)}</p>
                           </BootstrapTooltip>
-
                           <IconButton
                             aria-label="copy"
                             aria-hidden
@@ -482,6 +631,15 @@ function App() {
               </TableBody>
             </Table>
           </TableContainer>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={130}
+            rowsPerPage={parameters.take}
+            page={parameters.page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
         </div>
       </Container>
     </div>
