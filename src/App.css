@@ -1,0 +1,112 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+  box-sizing: border-box;
+  font-size: 62.5%;
+}
+
+body {
+  text-rendering: optimizeSpeed;
+  scroll-behavior: smooth;
+  font-size: 1.6rem;
+  line-height: 1.5;
+  background-color: #fdfdfe;
+  font-family: "Roboto", system-ui, -apple-system, "Segoe UI", "Helvetica Neue",
+    "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+.wrapper-table {
+  border-radius: 8px;
+  background-color: white;
+  border: 1.5px solid #e9ecef;
+}
+
+.wrapper-table-head {
+  padding: 12px;
+}
+
+.wrapper-table-head-info {
+  background-color: #e9ecef;
+  border: 1.5px solid #dee2e6;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 1.4rem;
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.wrapper-table-head-info-text {
+  display: flex;
+  align-items: center;
+  padding-right: 32px;
+  color: #495057;
+}
+
+.wrapper-table-head-info-text svg {
+  margin-right: 4px;
+}
+
+.btn-close-info {
+  position: absolute !important;
+  right: 0;
+  top: 0;
+}
+
+.wrapper-table-head-table-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wrapper-table-head-table-info p {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #212529;
+  font-size: 1.4rem;
+}
+
+.title-transaction-hash {
+  display: block;
+  color: rgb(7, 132, 195) !important;
+  text-decoration: none;
+  width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title-time-ago {
+  width: 80px;
+}
+
+.wrapper-address-title {
+  display: flex;
+  align-items: center;
+  width: 180px !important;
+}
+
+.wrapper-address-title p {
+  color: rgb(7, 132, 195) !important;
+  border: 1.5px dashed transparent;
+  border-radius: 6px;
+  padding: 0 2px;
+  box-sizing: border-box;
+}
+
+.MuiTableCell-root:hover .wrapper-address-title p {
+  background-color: #ffd95252;
+  border: 1px dashed #ffd439;
+  box-sizing: border-box;
+  border-radius: 6px;
+  padding: 0 2px;
+}
